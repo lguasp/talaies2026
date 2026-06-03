@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-7Y3981D4Y1"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date()); gtag('config','G-7Y3981D4Y1');
+  </script>
+  <meta charset="utf-8"/>
+  <title>Talaies pels drets humans 2026 — 3D</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<style>
+html,body{height:100%;margin:0;background:#000;font-family:Arial,sans-serif;overflow:hidden;}
+#cesiumContainer{width:100vw;height:100vh;}
+
+/* Hide Cesium default chrome we don't need */
+.cesium-widget-credits{display:none!important;}
+.cesium-viewer-toolbar{display:none!important;}
+
+.map-title{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  z-index:1000;background:rgba(0,0,0,0.7);color:#fff;
+  padding:8px 16px;border-radius:6px;font-size:18px;font-weight:bold;
+  text-align:center;pointer-events:none;white-space:nowrap;
+}
+.attribution-box{
+  position:absolute;bottom:8px;left:8px;
+  background:rgba(0,0,0,0.85);color:#fff;padding:8px 10px;
+  border-radius:6px;font-size:12px;line-height:1.4;z-index:1200;
+}
+.attribution-box a{color:#fff;text-decoration:underline;}
+
+/* ---- Controls containers ---- */
+#ctrl-left{
+  position:absolute;top:10px;left:10px;z-index:1000;
+  display:flex;flex-direction:column;gap:6px;
+}
+#ctrl-right{
+  position:absolute;top:10px;right:10px;z-index:1000;
+  display:flex;flex-direction:column;gap:6px;align-items:flex-end;
+}
+
+/* Dark button */
+.ctrl-btn{
+  background:rgba(0,0,0,0.85);color:#fff;border:1px solid #444;
+  border-radius:4px;padding:5px 10px;cursor:pointer;font-size:13px;
+  display:flex;align-items:center;gap:5px;white-space:nowrap;
+  user-select:none;
+}
+.ctrl-btn:hover{background:#111;}
+.ctrl-btn.active{background:rgba(26,77,46,0.9);border-color:#3a7d54;}
+
+/* Collapsible panel */
+.cpanel{
+  background:rgba(0,0,0,0.85);border:1px solid #444;
+  border-radius:6px;overflow:hidden;min-width:0;
+}
+.cpanel-hdr{
+  padding:5px 10px;cursor:pointer;font-size:13px;color:#fff;
+  display:flex;align-items:center;gap:6px;user-select:none;
+}
+.cpanel-hdr:hover{background:#111;}
+.cpanel-body{
+  display:none;padding:8px 10px;font-size:12px;color:#fff;
+  border-top:1px solid #333;
+}
+.cpanel.open .cpanel-body{display:block;}
+
+/* Layer list */
+.lyr-item{display:flex;align-items:center;gap:6px;padding:2px 0;cursor:pointer;}
+.lyr-item input[type=radio],.lyr-item input[type=checkbox]{cursor:pointer;}
+hr.sep{border:none;border-top:1px solid #333;margin:6px 0;}
+
+/* Territory select */
+#terr-filter{
+  width:100%;background:#111;color:#fff;border:1px solid #444;
+  border-radius:4px;font-size:12px;margin-top:4px;
+}
+
+/* Name search */
+.ns-input{
+  width:185px;background:#111;color:#fff;border:1px solid #444;
+  border-radius:4px;padding:5px 8px;font-size:12px;outline:none;
+  box-sizing:border-box;
+}
+.ns-input::placeholder{color:#bbb;}
+.ns-results{
+  margin-top:4px;max-height:200px;overflow-y:auto;
+  border:1px solid #333;border-radius:4px;background:rgba(0,0,0,0.95);
+  display:none;
+}
+.ns-item{padding:5px 8px;cursor:pointer;border-bottom:1px solid #222;font-size:12px;}
+.ns-item:last-child{border-bottom:none;}
+.ns-item:hover{background:#1a1a1a;}
+.ns-title{font-weight:700;}
+.ns-sub{font-size:11px;opacity:0.5;}
+
+/* Legend */
+.legend-title{font-weight:bold;margin:6px 0 3px;}
+.legend-circle{
+  display:inline-block;width:14px;height:14px;border-radius:50%;
+  border:3px solid #7a001c;background:var(--fill);
+  margin-right:6px;vertical-align:middle;
+}
+.legend-square{
+  display:inline-block;width:14px;height:14px;border-radius:2px;
+  border:1px solid #fff;background:var(--fill);
+  margin-right:6px;vertical-align:middle;
+}
+.legend-line{
+  width:20px;height:4px;display:inline-block;
+  margin-right:6px;border-radius:2px;vertical-align:middle;
+}
+.legend-swatch{
+  display:inline-block;width:14px;height:14px;border-radius:2px;
+  border:1px solid rgba(255,255,255,0.35);background:var(--fill);
+  margin-right:4px;vertical-align:middle;
+}
+
+/* Popup */
+#popup{
+  position:absolute;z-index:2000;background:rgba(0,0,0,0.92);color:#fff;
+  padding:10px 14px;border-radius:6px;font-size:13px;max-width:280px;
+  display:none;border:1px solid #555;line-height:1.5;
+}
+#popup .px-close{float:right;cursor:pointer;font-weight:bold;
+  margin-left:8px;opacity:0.6;font-size:16px;}
+#popup .px-close:hover{opacity:1;}
+#popup a{color:#8cf;}
+#popup img{max-width:240px;max-height:160px;border-radius:4px;
+  margin-top:6px;display:block;}
+
+/* Measure bar */
+#mbar{
+  position:absolute;bottom:52px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,0.85);color:#fff;padding:6px 14px;
+  border-radius:6px;font-size:13px;z-index:1000;display:none;
+  pointer-events:none;white-space:nowrap;
+}
+
+/* Nav hint */
+#nav-hint{
+  position:absolute;bottom:34px;right:10px;
+  background:rgba(0,0,0,0.65);color:#aaa;padding:5px 9px;
+  border-radius:6px;font-size:11px;z-index:1000;
+  line-height:1.7;pointer-events:none;
+}
+
+/* Scale bar */
+#scalebar{
+  position:absolute;bottom:8px;left:50%;transform:translateX(-50%);
+  z-index:1000;display:flex;flex-direction:column;align-items:center;
+  pointer-events:none;
+}
+#scalebar-lbl{color:#ccc;font-size:11px;margin-bottom:2px;}
+#scalebar-line{height:4px;background:#fff;border:1px solid #000;min-width:40px;}
+
+/* Loading */
+#loading{
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,0.85);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:9999;
+  color:#fff;font-size:15px;gap:14px;
+}
+.spinner{
+  width:38px;height:38px;border:4px solid #333;
+  border-top-color:#f28c28;border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* GPS blink */
+@keyframes blink{0%,49%{opacity:0.4}50%,100%{opacity:1}}
+#gps-btn.active{animation:blink 0.9s linear infinite;}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div>Carregant model de relleu i dades…</div>
+</div>
+
+<div id="cesiumContainer"></div>
+
+<div class="map-title">Talaies pels drets humans 2026 — 3D</div>
+
+<div class="attribution-box">
+  Autor: <a href="https://www.instagram.com/llorencguasp?igsh=M2x3bG9pN2RoaXps" target="_blank" rel="noopener">Llorenç Guasp</a>, 2026<br>
+  Agraïments: Josep Lluís Pol, Fons Mallorquí de Solidaritat i
+  <a href="https://www.torresitalaies.cat/" target="_blank" rel="noopener">www.torresitalaies.cat</a>
+</div>
+
+<!-- LEFT controls -->
+<div id="ctrl-left">
+
+  <!-- Territory filter -->
+  <div class="cpanel" id="p-terr">
+    <div class="cpanel-hdr" onclick="tog('p-terr')">🔽 Filtre territori</div>
+    <div class="cpanel-body">
+      <small>Ctrl/Cmd per seleccionar més d'un</small>
+      <select id="terr-filter" multiple size="6"></select>
+    </div>
+  </div>
+
+  <!-- Measure -->
+  <div class="cpanel" id="p-measure">
+    <div class="cpanel-hdr" id="measure-hdr" onclick="tog('p-measure');toggleMeasure()">
+      📏 Mesura
+    </div>
+    <div class="cpanel-body">
+      <small>Fes dos clics al terreny per mesurar.<br>Tercer clic per reiniciar.</small>
+    </div>
+  </div>
+
+</div>
+
+<!-- RIGHT controls -->
+<div id="ctrl-right">
+
+  <button class="ctrl-btn" onclick="flyToExtent()">⤢ Vista completa</button>
+  <button class="ctrl-btn" onclick="viewFromTop()">⬆ Vista zenital</button>
+
+  <button class="ctrl-btn" id="gps-btn" onclick="toggleGPS()">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="white">
+      <path d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A9 9 0 0013 3.06V1h-2v2.06A9 9 0 003.06 11H1v2h2.06A9 9 0 0011 20.94V23h2v-2.06A9 9 0 0020.94 13H23v-2h-2.06z"/>
+    </svg>
+    GPS
+  </button>
+
+  <!-- Name search -->
+  <div class="cpanel" id="p-search">
+    <div class="cpanel-hdr" onclick="tog('p-search')">🔎 Cercar per talaia</div>
+    <div class="cpanel-body">
+      <input class="ns-input" id="ns-input" type="text" placeholder="Cercar per talaia…"/>
+      <div class="ns-results" id="ns-results"></div>
+    </div>
+  </div>
+
+  <!-- Layers -->
+  <div class="cpanel" id="p-layers">
+    <div class="cpanel-hdr" onclick="tog('p-layers')">🗺️ Capes</div>
+    <div class="cpanel-body">
+      <b style="font-size:11px;opacity:0.7;">MAPA BASE</b>
+      <label class="lyr-item"><input type="radio" name="bm" value="light" checked onchange="switchBase(this.value)"> Mapa OSM gris</label>
+      <label class="lyr-item"><input type="radio" name="bm" value="dark" onchange="switchBase(this.value)"> Mapa OSM fosc</label>
+      <label class="lyr-item"><input type="radio" name="bm" value="sat" onchange="switchBase(this.value)"> Imatge aèria</label>
+      <label class="lyr-item"><input type="radio" name="bm" value="topo" onchange="switchBase(this.value)"> Mapa topogràfic</label>
+      <hr class="sep">
+      <b style="font-size:11px;opacity:0.7;">CAPES</b>
+      <label class="lyr-item"><input type="checkbox" checked onchange="setLayerVis('talaies',this.checked)"> Talaies</label>
+      <label class="lyr-item"><input type="checkbox" checked onchange="setLayerVis('altres',this.checked)"> Altres punts</label>
+      <label class="lyr-item"><input type="checkbox" checked onchange="setLayerVis('linies',this.checked)"> Línies de visibilitat</label>
+      <label class="lyr-item"><input type="checkbox" onchange="setLayerVis('contaminacio',this.checked)"> Contaminació lumínica</label>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div class="cpanel" id="p-legend">
+    <div class="cpanel-hdr" onclick="tog('p-legend')">▸ Llegenda</div>
+    <div class="cpanel-body">
+      <div class="legend-title">Talaies (cilindres)</div>
+      <span class="legend-circle" style="--fill:#f28c28;"></span>participen<br>
+      <span class="legend-circle" style="--fill:#9e9e9e;"></span>no participen<br>
+      <div class="legend-title">Altres punts</div>
+      <span class="legend-square" style="--fill:#1c6331;"></span>participen<br>
+      <span class="legend-square" style="--fill:#6f6f6f;"></span>no participen<br>
+      <div class="legend-title">Línies de visibilitat</div>
+      <span class="legend-line" style="background:#17aeff;"></span>directa<br>
+      <span class="legend-line" style="background:transparent;border-top:2px dashed #ff4444;"></span>revisar<br>
+      <div class="legend-title">Contaminació lumínica</div>
+      <span class="legend-swatch" style="--fill:#440154;"></span>
+      <span class="legend-swatch" style="--fill:#481f70;"></span>
+      <span class="legend-swatch" style="--fill:#443a82;"></span>
+      <span class="legend-swatch" style="--fill:#3b528b;"></span>
+      <span class="legend-swatch" style="--fill:#31688e;"></span>
+      <span class="legend-swatch" style="--fill:#297c8e;"></span>
+      <span class="legend-swatch" style="--fill:#21908d;"></span>
+      <span class="legend-swatch" style="--fill:#32c563;"></span>
+      <span class="legend-swatch" style="--fill:#85ea11;"></span>
+      <span class="legend-swatch" style="--fill:#b7f410;"></span>
+      <span class="legend-swatch" style="--fill:#e4f803;"></span>
+      <span class="legend-swatch" style="--fill:#fcd602;"></span>
+    </div>
+  </div>
+
+</div>
+
+<div id="mbar">Mode mesura — fes clic al terreny (punt 1)</div>
+
+<div id="nav-hint">
+  🖱 Arrossegar: orbitar · Botó dret: inclinar<br>
+  🖱 Roda: zoom · Maj+arrossegar: inclinar<br>
+  ✌ Dos dits: inclinar / rotar
+</div>
+
+<div id="popup"><span class="px-close" onclick="closePopup()">✕</span><div id="popup-body"></div></div>
+
+<div id="scalebar">
+  <div id="scalebar-lbl"></div>
+  <div id="scalebar-line"></div>
+</div>
+
+<script>
+'use strict';
+
+// ────────────────────────────────────────────────
+// Cesium — use ArcGIS terrain (free, no token needed)
+// ────────────────────────────────────────────────
+Cesium.Ion.defaultAccessToken = '';   // not using Cesium Ion services
+
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  terrainProvider          : new Cesium.EllipsoidTerrainProvider(),
+  baseLayerPicker          : false,
+  geocoder                 : false,
+  homeButton               : false,
+  sceneModePicker          : false,
+  navigationHelpButton     : false,
+  animation                : false,
+  timeline                 : false,
+  fullscreenButton         : false,
+  vrButton                 : false,
+  infoBox                  : false,
+  selectionIndicator       : false,
+  shadows                  : false,
+  terrainShadows           : Cesium.ShadowMode.DISABLED
+});
+
+viewer.scene.globe.depthTestAgainstTerrain = true;
+viewer.scene.globe.enableLighting         = false;
+viewer.scene.fog.enabled                  = false;
+
+// ────────────────────────────────────────────────
+// Basemaps
+// ────────────────────────────────────────────────
+const IL = viewer.imageryLayers;
+IL.removeAll();
+
+function makeProvider(key){
+  const providers = {
+    light : new Cesium.UrlTemplateImageryProvider({
+      url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+      subdomains:['a','b','c','d'], maximumLevel:19,
+      credit:'CARTO | © OpenStreetMap contributors'
+    }),
+    dark  : new Cesium.UrlTemplateImageryProvider({
+      url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+      subdomains:['a','b','c','d'], maximumLevel:19,
+      credit:'CARTO Dark | © OpenStreetMap contributors'
+    }),
+    sat   : new Cesium.UrlTemplateImageryProvider({
+      url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+      maximumLevel:19, credit:'Esri World Imagery'
+    }),
+    topo  : new Cesium.UrlTemplateImageryProvider({
+      url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+      subdomains:['a','b','c'], maximumLevel:17, credit:'OpenTopoMap'
+    })
+  };
+  return providers[key];
+}
+let baseLayer = IL.addImageryProvider(makeProvider('light'));
+
+function switchBase(key){
+  IL.remove(baseLayer, false);
+  baseLayer = IL.addImageryProvider(makeProvider(key), 0);
+}
+
+// ────────────────────────────────────────────────
+// Colour constants (same as original)
+// ────────────────────────────────────────────────
+const C_OUTLINE = '#7a001c';
+const C_TALAIES = { 'talaies - participen':'#f28c28', 'talaies - no participen':'#9e9e9e' };
+const C_ALTRES  = { 'altres - participen':'#1c6331',  'altres - no participen':'#6f6f6f'  };
+const C_LINIES  = { 'directe':'#17aeff', 'REVISAR':'#ff4444' };
+const DN_COLORS = {
+  0:'#440154', 5:'#481f70', 7:'#443a82', 16:'#3b528b', 18:'#31688e',
+  23:'#297c8e', 170:'#21908d', 230:'#32c563', 235:'#85ea11',
+  240:'#b7f410', 250:'#e4f803', 255:'#fcd602'
+};
+
+// ────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────
+let talaiaEntries  = [];   // {nom, territori, lon, lat, entity, labelEnt, props, visible}
+let altresEntries  = [];
+let territorisSet  = new Set();
+let liniesData     = null;
+let liniesDS       = new Cesium.CustomDataSource('linies');      // active selected lines
+let contamDS       = new Cesium.CustomDataSource('contaminacio');
+let fullExtRect    = null;
+
+viewer.dataSources.add(liniesDS);
+viewer.dataSources.add(contamDS);
+contamDS.show = false;
+
+const layerVis = { talaies:true, altres:true, linies:true, contaminacio:false };
+
+// ────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────
+function getProp(p, keys){
+  for(const k of keys){
+    if(!p) continue;
+    const v = p[k];
+    if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+  }
+  return '';
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
+function hex(h, a){ const c=Cesium.Color.fromCssColorString(h); return a!==undefined?c.withAlpha(a):c; }
+
+function buildPopup(props){
+  const nom    = getProp(props,['nom','Nom','name','Name']);
+  const tipus  = getProp(props,['Tipus','tipus']);
+  const estat  = getProp(props,['estat','Estat','estat_conservacio']);
+  const mun    = getProp(props,['municipi','Municipi']);
+  const horari = getProp(props,['horari_encesa','Horari_encesa']);
+  const link   = getProp(props,['link','Link','url','URL']);
+  const senyal = getProp(props,['senyal','Senyal']);
+  const img    = getProp(props,['imatge','Imatge','image','Image']);
+  let h='';
+  if(nom)    h+=`<b>${esc(nom)}</b><br>`;
+  if(tipus)  h+=`Tipus: ${esc(tipus)}<br>`;
+  if(estat)  h+=`Estat: ${esc(estat)}<br>`;
+  if(mun)    h+=`Municipi: ${esc(mun)}<br>`;
+  if(horari) h+=`Horari: ${esc(horari)}<br>`;
+  if(link)   h+=`<a href="${esc(String(link))}" target="_blank">+info</a><br>`;
+  if(senyal) h+=`Senyal: ${esc(senyal)}<br>`;
+  if(img)    h+=`<img src="${esc(String(img))}" alt="imatge">`;
+  return h||'<i>Sense informació</i>';
+}
+
+function propsToObj(bag){
+  const o={};
+  if(!bag) return o;
+  const now = Cesium.JulianDate.now();
+  (bag.propertyNames || []).forEach(k=>{
+    try{
+      const v = bag[k];
+      o[k] = (v && typeof v.getValue === 'function') ? v.getValue(now) : v;
+    }catch(e){}
+  });
+  return o;
+}
+
+// ────────────────────────────────────────────────
+// Popup
+// ────────────────────────────────────────────────
+function showPopup(html, x, y){
+  const el=document.getElementById('popup');
+  document.getElementById('popup-body').innerHTML=html;
+  el.style.display='block';
+  const pw=300, ph=220;
+  let px=x+12, py=y-ph/2;
+  if(px+pw>window.innerWidth)  px=x-pw-12;
+  if(py<10)                    py=10;
+  if(py+ph>window.innerHeight) py=window.innerHeight-ph-10;
+  el.style.left=px+'px'; el.style.top=py+'px';
+}
+function closePopup(){ document.getElementById('popup').style.display='none'; }
+
+// ────────────────────────────────────────────────
+// Panel toggle
+// ────────────────────────────────────────────────
+function tog(id){ document.getElementById(id).classList.toggle('open'); }
+
+// ────────────────────────────────────────────────
+// Entity constructors
+// ────────────────────────────────────────────────
+const LABEL_DC  = new Cesium.DistanceDisplayCondition(0, 15000);
+const LABEL_NFS = new Cesium.NearFarScalar(500, 1.2, 15000, 0.0);
+
+function addTalaia(nom, lon, lat, terrH, simbologia, props){
+  const fillC  = hex(C_TALAIES[simbologia] || '#999');
+  const outC   = hex(C_OUTLINE);
+  const ctrAlt = terrH + 4;        // cylinder centre = DEM + half-height (8/2)
+
+  const entity = viewer.entities.add({
+    position : Cesium.Cartesian3.fromDegrees(lon, lat, ctrAlt),
+    cylinder : {
+      length         : 8.0,
+      topRadius      : 3.0,
+      bottomRadius   : 3.0,
+      material       : fillC,
+      outline        : true,
+      outlineColor   : outC,
+      outlineWidth   : 2,
+      numberOfVerticalLines: 16,
+      shadows        : Cesium.ShadowMode.DISABLED
+    },
+    properties : props,
+    show       : layerVis.talaies
+  });
+
+  const labelEnt = nom ? viewer.entities.add({
+    position : Cesium.Cartesian3.fromDegrees(lon, lat, terrH + 12),
+    label : {
+      text      : nom,
+      font      : 'bold 12px Arial',
+      fillColor : Cesium.Color.BLACK,
+      outlineColor : Cesium.Color.WHITE,
+      outlineWidth : 2,
+      style     : Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin   : Cesium.VerticalOrigin.BOTTOM,
+      horizontalOrigin : Cesium.HorizontalOrigin.LEFT,
+      pixelOffset      : new Cesium.Cartesian2(5, 0),
+      scaleByDistance  : LABEL_NFS,
+      distanceDisplayCondition : LABEL_DC,
+      disableDepthTestDistance : Number.POSITIVE_INFINITY,
+      show : layerVis.talaies
+    }
+  }) : null;
+
+  return { entity, labelEnt };
+}
+
+function addAltres(nom, lon, lat, terrH, simbologia, props){
+  const fillC = hex(C_ALTRES[simbologia] || '#999');
+  const sz    = 5;  // half-size metres (10m box)
+  const entity = viewer.entities.add({
+    position : Cesium.Cartesian3.fromDegrees(lon, lat, terrH + sz),
+    box : {
+      dimensions   : new Cesium.Cartesian3(sz*2, sz*2, sz*2),
+      material     : fillC,
+      outline      : true,
+      outlineColor : Cesium.Color.WHITE.withAlpha(0.7),
+      shadows      : Cesium.ShadowMode.DISABLED
+    },
+    properties : props,
+    show       : layerVis.altres
+  });
+
+  const labelEnt = nom ? viewer.entities.add({
+    position : Cesium.Cartesian3.fromDegrees(lon, lat, terrH + sz*2 + 3),
+    label : {
+      text      : nom,
+      font      : 'bold 12px Arial',
+      fillColor : Cesium.Color.BLACK,
+      outlineColor : Cesium.Color.WHITE,
+      outlineWidth : 2,
+      style     : Cesium.LabelStyle.FILL_AND_OUTLINE,
+      verticalOrigin   : Cesium.VerticalOrigin.BOTTOM,
+      horizontalOrigin : Cesium.HorizontalOrigin.LEFT,
+      pixelOffset      : new Cesium.Cartesian2(5, 0),
+      scaleByDistance  : LABEL_NFS,
+      distanceDisplayCondition : LABEL_DC,
+      disableDepthTestDistance : Number.POSITIVE_INFINITY,
+      show : layerVis.altres
+    }
+  }) : null;
+
+  return { entity, labelEnt };
+}
+
+// ────────────────────────────────────────────────
+// Draw visibility lines for a clicked tower
+// ────────────────────────────────────────────────
+function drawLiniesFor(lon, lat){
+  liniesDS.entities.removeAll();
+  if(!liniesData || !layerVis.linies) return;
+
+  const pt = turf.point([lon, lat]);
+  const sel = (liniesData.features||[]).filter(ft => {
+    try{ return turf.booleanPointOnLine(pt, ft); } catch(e){ return false; }
+  });
+  if(!sel.length) return;
+
+  sel.forEach(ft => {
+    const tipus = ft.properties ? ft.properties.Tipus : null;
+    const col   = hex(C_LINIES[tipus]||'#ffffff', 0.7);
+    const dash  = tipus === 'REVISAR';
+    const coords = ft.geometry.coordinates;
+    const positions = coords.map(c => Cesium.Cartesian3.fromDegrees(c[0],c[1]));
+
+    liniesDS.entities.add({
+      polyline : {
+        positions : positions,
+        width     : 2.5,
+        material  : dash
+          ? new Cesium.PolylineDashMaterialProperty({ color:col, dashLength:18 })
+          : new Cesium.ColorMaterialProperty(col),
+        clampToGround       : true,
+        classificationType  : Cesium.ClassificationType.TERRAIN
+      },
+      properties : ft.properties
+    });
+
+    // Distance label at line midpoint
+    const dist = ft.properties ? ft.properties.distancia_km : null;
+    if(dist !== null && dist !== undefined && dist !== ''){
+      const ctr = turf.center(ft).geometry.coordinates;
+      liniesDS.entities.add({
+        position : Cesium.Cartesian3.fromDegrees(ctr[0], ctr[1]),
+        label : {
+          text      : String(dist)+' km',
+          font      : '12px Arial',
+          fillColor : hex('#17aeff'),
+          outlineColor : Cesium.Color.WHITE,
+          outlineWidth : 2,
+          style     : Cesium.LabelStyle.FILL_AND_OUTLINE,
+          disableDepthTestDistance : Number.POSITIVE_INFINITY,
+          distanceDisplayCondition : new Cesium.DistanceDisplayCondition(0,120000)
+        }
+      });
+    }
+  });
+}
+
+// ────────────────────────────────────────────────
+// Load data
+// ────────────────────────────────────────────────
+async function init(){
+  // Load terrain provider and GeoJSON in parallel
+  const [terrainProvider, [talaiesJSON, altresJSON, liniesJSON, contamJSON]] = await Promise.all([
+    Cesium.ArcGISTiledElevationTerrainProvider.fromUrl(
+      'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer'
+    ),
+    Promise.all([
+      fetch('talaies_260126.geojson').then(r=>r.json()),
+      fetch('altres_punts_260126.geojson').then(r=>r.json()),
+      fetch('linies_vis_260126.geojson').then(r=>r.json()),
+      fetch('contaminacio_lum_4326.geojson').then(r=>r.json())
+    ])
+  ]);
+
+  viewer.terrainProvider = terrainProvider;
+  liniesData = liniesJSON;
+
+  const tFeats = talaiesJSON.features || [];
+  const aFeats = altresJSON.features  || [];
+
+  // Build Cartographic array for batch terrain sampling
+  const cartos = [
+    ...tFeats.map(f => Cesium.Cartographic.fromDegrees(f.geometry.coordinates[0], f.geometry.coordinates[1])),
+    ...aFeats.map(f => Cesium.Cartographic.fromDegrees(f.geometry.coordinates[0], f.geometry.coordinates[1]))
+  ];
+
+  // Sample terrain heights (most detailed available)
+  let sampled;
+  try {
+    sampled = await Cesium.sampleTerrainMostDetailed(terrainProvider, cartos);
+  } catch(e) {
+    console.warn('sampleTerrainMostDetailed failed, trying level 11:', e);
+    try {
+      sampled = await Cesium.sampleTerrain(terrainProvider, 11, cartos);
+    } catch(e2) {
+      console.warn('Terrain sampling unavailable, using 0:', e2);
+      sampled = cartos.map(() => ({ height: 0 }));
+    }
+  }
+
+  const tHeights = sampled.slice(0, tFeats.length);
+  const aHeights = sampled.slice(tFeats.length);
+
+  // Build territory set
+  [...tFeats, ...aFeats].forEach(f => {
+    const t = getProp(f.properties, ['Territori','territori']) || 'Altres';
+    territorisSet.add(t);
+  });
+
+  // Populate territory filter UI
+  const sel = document.getElementById('terr-filter');
+  Array.from(territorisSet).sort().forEach(t => {
+    const o=document.createElement('option'); o.value=t; o.textContent=t; sel.appendChild(o);
+  });
+  sel.addEventListener('change', ()=>{
+    const vals = Array.from(sel.selectedOptions).map(o=>o.value);
+    applyFilter(vals);
+  });
+
+  // Create tower (talaia) entities
+  tFeats.forEach((f,i) => {
+    const [lon,lat] = f.geometry.coordinates;
+    const p    = f.properties || {};
+    const nom  = getProp(p, ['nom','Nom','name','Name']);
+    const simb = p.simbologia || '';
+    const terr = getProp(p, ['Territori','territori']) || 'Altres';
+    const h    = tHeights[i] ? (tHeights[i].height || 0) : 0;
+    const { entity, labelEnt } = addTalaia(nom, lon, lat, h, simb, p);
+    talaiaEntries.push({ nom, territori:terr, lon, lat, entity, labelEnt, props:p, visible:true });
+  });
+
+  // Create altres punts entities
+  aFeats.forEach((f,i) => {
+    const [lon,lat] = f.geometry.coordinates;
+    const p    = f.properties || {};
+    const nom  = getProp(p, ['nom','Nom','name','Name']);
+    const simb = p.simbologia || '';
+    const terr = getProp(p, ['Territori','territori']) || 'Altres';
+    const h    = aHeights[i] ? (aHeights[i].height || 0) : 0;
+    const { entity, labelEnt } = addAltres(nom, lon, lat, h, simb, p);
+    altresEntries.push({ nom, territori:terr, lon, lat, entity, labelEnt, props:p, visible:true });
+  });
+
+  // Light pollution — polygon entities (clamp to ground, off by default)
+  (contamJSON.features||[]).forEach(f => {
+    if(!f.geometry) return;
+    const dn  = f.properties ? f.properties.DN : null;
+    const col = hex(DN_COLORS[dn]||'#999', 0.5);
+    const geom = f.geometry;
+
+    const processRings = (rings) => {
+      if(!rings || !rings[0]) return;
+      try{
+        const positions = rings[0].map(c => Cesium.Cartesian3.fromDegrees(c[0],c[1]));
+        const holes = rings.slice(1).map(r => new Cesium.PolygonHierarchy(
+          r.map(c => Cesium.Cartesian3.fromDegrees(c[0],c[1]))
+        ));
+        contamDS.entities.add({
+          polygon:{
+            hierarchy        : new Cesium.PolygonHierarchy(positions, holes),
+            material         : col,
+            classificationType : Cesium.ClassificationType.TERRAIN,
+            outline          : false
+          }
+        });
+      }catch(e){}
+    };
+
+    if(geom.type === 'Polygon'){
+      processRings(geom.coordinates);
+    } else if(geom.type === 'MultiPolygon'){
+      geom.coordinates.forEach(rings => processRings(rings));
+    }
+  });
+
+  // Compute full extent and fly there
+  const lons = [...talaiaEntries, ...altresEntries].map(e=>e.lon);
+  const lats = [...talaiaEntries, ...altresEntries].map(e=>e.lat);
+  if(lons.length){
+    fullExtRect = Cesium.Rectangle.fromDegrees(
+      Math.min(...lons), Math.min(...lats),
+      Math.max(...lons), Math.max(...lats)
+    );
+  }
+  flyToExtent(1.5);
+
+  document.getElementById('loading').style.display = 'none';
+}
+
+// ────────────────────────────────────────────────
+// Camera controls
+// ────────────────────────────────────────────────
+function flyToExtent(dur){
+  if(!fullExtRect) return;
+  viewer.camera.flyTo({
+    destination  : fullExtRect,
+    orientation  : { heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 },
+    duration     : dur || 1.5
+  });
+}
+
+function viewFromTop(){
+  viewer.camera.flyTo({
+    destination  : viewer.camera.position,
+    orientation  : { heading:viewer.camera.heading, pitch:Cesium.Math.toRadians(-90), roll:0 },
+    duration     : 0.7
+  });
+}
+
+// ────────────────────────────────────────────────
+// Layer visibility
+// ────────────────────────────────────────────────
+function setLayerVis(name, vis){
+  layerVis[name] = vis;
+  if(name === 'talaies'){
+    talaiaEntries.forEach(e => {
+      if(e.entity)   e.entity.show   = vis && e.visible;
+      if(e.labelEnt) e.labelEnt.show = vis && e.visible;
+    });
+  } else if(name === 'altres'){
+    altresEntries.forEach(e => {
+      if(e.entity)   e.entity.show   = vis && e.visible;
+      if(e.labelEnt) e.labelEnt.show = vis && e.visible;
+    });
+  } else if(name === 'linies'){
+    liniesDS.show = vis;
+  } else if(name === 'contaminacio'){
+    contamDS.show = vis;
+  }
+}
+
+// ────────────────────────────────────────────────
+// Territory filter
+// ────────────────────────────────────────────────
+function applyFilter(sel){
+  const all = sel.length === 0;
+  const ok  = t => all || sel.includes(t);
+
+  talaiaEntries.forEach(e => {
+    e.visible = ok(e.territori);
+    if(e.entity)   e.entity.show   = layerVis.talaies && e.visible;
+    if(e.labelEnt) e.labelEnt.show = layerVis.talaies && e.visible;
+  });
+  altresEntries.forEach(e => {
+    e.visible = ok(e.territori);
+    if(e.entity)   e.entity.show   = layerVis.altres && e.visible;
+    if(e.labelEnt) e.labelEnt.show = layerVis.altres && e.visible;
+  });
+
+  if(!all){
+    const vis = [...talaiaEntries, ...altresEntries].filter(e=>e.visible);
+    if(vis.length){
+      const r = Cesium.Rectangle.fromDegrees(
+        Math.min(...vis.map(e=>e.lon)), Math.min(...vis.map(e=>e.lat)),
+        Math.max(...vis.map(e=>e.lon)), Math.max(...vis.map(e=>e.lat))
+      );
+      viewer.camera.flyTo({
+        destination : r,
+        orientation : { heading:0, pitch:Cesium.Math.toRadians(-50), roll:0 },
+        duration    : 1.0
+      });
+    }
+  }
+}
+
+// ────────────────────────────────────────────────
+// Name search
+// ────────────────────────────────────────────────
+const nsInput   = document.getElementById('ns-input');
+const nsResults = document.getElementById('ns-results');
+
+function collectMatches(q){
+  const query = q.trim().toLowerCase();
+  if(!query) return [];
+  const all = [
+    ...talaiaEntries.map(e => ({...e, lyrLabel:'Talaies'})),
+    ...altresEntries.map(e => ({...e, lyrLabel:'Altres punts'}))
+  ];
+  return all
+    .filter(e => e.nom && e.nom.toLowerCase().includes(query))
+    .sort((a,b) => a.nom.localeCompare(b.nom,'ca'))
+    .slice(0,12);
+}
+
+function renderMatches(matches){
+  if(!matches.length){ nsResults.style.display='none'; return; }
+  nsResults.style.display='block';
+  nsResults.innerHTML = matches.map((m,i)=>
+    `<div class="ns-item" data-i="${i}">
+       <div class="ns-title">${esc(m.nom)}</div>
+       <div class="ns-sub">${esc(m.lyrLabel)}</div>
+     </div>`
+  ).join('');
+  nsResults.querySelectorAll('.ns-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const m = matches[+el.dataset.i]; if(!m) return;
+      viewer.camera.flyTo({
+        destination : Cesium.Cartesian3.fromDegrees(m.lon, m.lat, 1800),
+        orientation : { heading:0, pitch:Cesium.Math.toRadians(-40), roll:0 },
+        duration    : 1.2
+      });
+      showPopup(buildPopup(m.props), window.innerWidth/2, window.innerHeight/2);
+      nsResults.style.display='none';
+      drawLiniesFor(m.lon, m.lat);
+    });
+  });
+}
+
+nsInput.addEventListener('input', () => renderMatches(collectMatches(nsInput.value)));
+nsInput.addEventListener('keydown', e => {
+  if(e.key==='Escape'){ nsResults.style.display='none'; return; }
+  if(e.key==='Enter'){
+    const m = collectMatches(nsInput.value)[0]; if(!m) return;
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(m.lon,m.lat,1800),
+      orientation:{ heading:0, pitch:Cesium.Math.toRadians(-40), roll:0 }, duration:1.2
+    });
+    showPopup(buildPopup(m.props), window.innerWidth/2, window.innerHeight/2);
+    nsResults.style.display='none';
+    drawLiniesFor(m.lon, m.lat);
+  }
+});
+
+// ────────────────────────────────────────────────
+// Click handler
+// ────────────────────────────────────────────────
+const evtHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+
+evtHandler.setInputAction(mv => {
+  if(measuring){ handleMeasureClick(mv); return; }
+
+  const picked = viewer.scene.pick(mv.position);
+  if(!Cesium.defined(picked) || !picked.id){ closePopup(); return; }
+
+  const ent   = picked.id;
+  const props = ent.properties ? propsToObj(ent.properties) : null;
+  if(!props) return;
+
+  showPopup(buildPopup(props), mv.position.x, mv.position.y);
+
+  // If a tower was clicked, draw its visibility lines
+  const entry =
+    talaiaEntries.find(e => e.entity === ent) ||
+    altresEntries.find(e => e.entity === ent);
+  if(entry) drawLiniesFor(entry.lon, entry.lat);
+
+}, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+// ────────────────────────────────────────────────
+// Measure tool
+// ────────────────────────────────────────────────
+let measuring      = false;
+let measurePts     = [];
+let measureEnts    = [];
+
+function toggleMeasure(){
+  measuring = !measuring;
+  const bar = document.getElementById('mbar');
+  if(measuring){
+    bar.style.display='block';
+    bar.textContent='Mode mesura — fes clic al terreny (punt 1)';
+    clearMeasure();
+    document.getElementById('measure-hdr').style.color='#f28c28';
+  } else {
+    bar.style.display='none';
+    clearMeasure();
+    document.getElementById('measure-hdr').style.color='';
+  }
+}
+
+function clearMeasure(){
+  measurePts=[];
+  measureEnts.forEach(e => viewer.entities.remove(e));
+  measureEnts=[];
+}
+
+function handleMeasureClick(mv){
+  const ray = viewer.camera.getPickRay(mv.position);
+  const pos = viewer.scene.globe.pick(ray, viewer.scene);
+  if(!pos) return;
+
+  const carto = Cesium.Cartographic.fromCartesian(pos);
+  const lon   = Cesium.Math.toDegrees(carto.longitude);
+  const lat   = Cesium.Math.toDegrees(carto.latitude);
+
+  measureEnts.push(viewer.entities.add({
+    position : pos,
+    point    : { pixelSize:8, color:Cesium.Color.WHITE, outlineColor:Cesium.Color.BLACK, outlineWidth:1,
+                 disableDepthTestDistance:Number.POSITIVE_INFINITY }
+  }));
+  measurePts.push({ lon, lat, pos });
+
+  const bar = document.getElementById('mbar');
+
+  if(measurePts.length === 1){
+    bar.textContent = 'Mode mesura — fes clic al terreny (punt 2)';
+  } else if(measurePts.length === 2){
+    const p1=measurePts[0], p2=measurePts[1];
+    measureEnts.push(viewer.entities.add({
+      polyline:{ positions:[p1.pos,p2.pos], width:2,
+        material:new Cesium.ColorMaterialProperty(Cesium.Color.CYAN.withAlpha(0.85)) }
+    }));
+    const d = turf.distance(turf.point([p1.lon,p1.lat]), turf.point([p2.lon,p2.lat]), {units:'kilometers'});
+    const mid = Cesium.Cartesian3.midpoint(p1.pos, p2.pos, new Cesium.Cartesian3());
+    measureEnts.push(viewer.entities.add({
+      position:mid,
+      label:{
+        text     : (d*1000).toFixed(0)+' m',
+        font     : '13px Arial',
+        fillColor: Cesium.Color.CYAN,
+        outlineColor:Cesium.Color.BLACK, outlineWidth:2,
+        style    : Cesium.LabelStyle.FILL_AND_OUTLINE,
+        disableDepthTestDistance:Number.POSITIVE_INFINITY
+      }
+    }));
+    bar.textContent = `Distància: ${(d*1000).toFixed(0)} m — fes clic per reiniciar`;
+    measurePts=[];
+  }
+}
+
+// ────────────────────────────────────────────────
+// GPS
+// ────────────────────────────────────────────────
+let gpsActive=false, gpsEnt=null, gpsWatchId=null;
+
+function toggleGPS(){
+  gpsActive = !gpsActive;
+  document.getElementById('gps-btn').classList.toggle('active', gpsActive);
+  if(gpsActive){
+    if(!navigator.geolocation){
+      alert('Geolocalització no disponible'); gpsActive=false;
+      document.getElementById('gps-btn').classList.remove('active'); return;
+    }
+    gpsWatchId = navigator.geolocation.watchPosition(pos=>{
+      const lon=pos.coords.longitude, lat=pos.coords.latitude, acc=pos.coords.accuracy;
+      if(!gpsEnt){
+        gpsEnt = viewer.entities.add({
+          position : Cesium.Cartesian3.fromDegrees(lon,lat,10),
+          point    : { pixelSize:13, color:Cesium.Color.CYAN, outlineColor:Cesium.Color.WHITE, outlineWidth:2,
+                       disableDepthTestDistance:Number.POSITIVE_INFINITY },
+          ellipse  : { semiMajorAxis:acc, semiMinorAxis:acc,
+                       material:Cesium.Color.CYAN.withAlpha(0.12),
+                       outline:true, outlineColor:Cesium.Color.CYAN.withAlpha(0.5) }
+        });
+        viewer.camera.flyTo({
+          destination:Cesium.Cartesian3.fromDegrees(lon,lat,3000),
+          orientation:{heading:0,pitch:Cesium.Math.toRadians(-45),roll:0}
+        });
+      } else {
+        gpsEnt.position = new Cesium.ConstantPositionProperty(Cesium.Cartesian3.fromDegrees(lon,lat,10));
+        if(gpsEnt.ellipse){
+          gpsEnt.ellipse.semiMajorAxis = new Cesium.ConstantProperty(acc);
+          gpsEnt.ellipse.semiMinorAxis = new Cesium.ConstantProperty(acc);
+        }
+      }
+    }, err=>{ console.warn('GPS:',err); gpsActive=false;
+      document.getElementById('gps-btn').classList.remove('active'); },
+    { enableHighAccuracy:true, maximumAge:3000 });
+  } else {
+    if(gpsWatchId!==null){ navigator.geolocation.clearWatch(gpsWatchId); gpsWatchId=null; }
+    if(gpsEnt){ viewer.entities.remove(gpsEnt); gpsEnt=null; }
+  }
+}
+
+// ────────────────────────────────────────────────
+// Scale bar (updates each frame)
+// ────────────────────────────────────────────────
+viewer.scene.postRender.addEventListener(()=>{
+  const canvas = viewer.scene.canvas;
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  const mid = h / 2;
+  const left  = viewer.scene.globe.pick(viewer.camera.getPickRay(new Cesium.Cartesian2(0,   mid)), viewer.scene);
+  const right = viewer.scene.globe.pick(viewer.camera.getPickRay(new Cesium.Cartesian2(w,   mid)), viewer.scene);
+  if(!left||!right) return;
+  const gl = Cesium.Cartographic.fromCartesian(left);
+  const gr = Cesium.Cartographic.fromCartesian(right);
+  const total = turf.distance(
+    turf.point([Cesium.Math.toDegrees(gl.longitude),Cesium.Math.toDegrees(gl.latitude)]),
+    turf.point([Cesium.Math.toDegrees(gr.longitude),Cesium.Math.toDegrees(gr.latitude)]),
+    {units:'meters'}
+  );
+  if(total<=0) return;
+  const target = total * (120/w);
+  const mag    = Math.pow(10, Math.floor(Math.log10(target)));
+  const nice   = [1,2,5,10].map(n=>n*mag).find(n=>n>=target) || target;
+  const pxW    = (nice/total)*w;
+  document.getElementById('scalebar-lbl').textContent  = nice>=1000 ? (nice/1000).toFixed(0)+' km' : nice.toFixed(0)+' m';
+  document.getElementById('scalebar-line').style.width = pxW+'px';
+});
+
+// ────────────────────────────────────────────────
+// Boot
+// ────────────────────────────────────────────────
+init().catch(err => {
+  console.error(err);
+  document.getElementById('loading').innerHTML =
+    `<div style="color:#f28c28;text-align:center;padding:20px">
+       Error carregant dades o model de relleu.<br>
+       Revisa que els fitxers GeoJSON siguin accessibles<br>
+       i que estàs obrint el mapa des d'un servidor local.<br><br>
+       <small style="opacity:0.6">${err.message||err}</small>
+     </div>`;
+});
+</script>
+</body>
+</html>
